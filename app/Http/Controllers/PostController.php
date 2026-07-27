@@ -10,11 +10,23 @@ class PostController extends Controller
 {
     public function index(Request $request)
     {
-        $locale = $request->get('lang', 'en');
+        $locale = $request->get(
+            'lang',
+            auth()->user()->preferred_language ?? 'en'
+        );
 
-        $posts = Post::with(['translations' => function ($query) use ($locale) {
-            $query->where('locale', $locale);
-        }])->get();
+        $posts = Post::whereHas('translations', function ($query) use ($locale) {
+
+            $query->where('locale', $locale)
+                ->where('status', 'approved');
+        })
+            ->with(['translations' => function ($query) use ($locale) {
+
+                $query->where('locale', $locale)
+                    ->where('status', 'approved');
+            }])
+            ->get();
+
 
         $formattedPosts = $posts->map(function ($post) use ($locale) {
             $translation = $post->getTranslated($locale);
@@ -74,11 +86,22 @@ class PostController extends Controller
 
     public function show(Request $request, $id)
     {
-        $locale = $request->get('lang', 'en');
+        $locale = $request->get(
+            'lang',
+            auth()->user()->preferred_language ?? 'en'
+        );
 
-        $post = Post::with(['translations' => function ($query) use ($locale) {
-            $query->where('locale', $locale);
-        }])->find($id);
+        $post = Post::whereHas('translations', function ($query) use ($locale) {
+
+            $query->where('locale', $locale)
+                ->where('status', 'approved');
+        })
+            ->with(['translations' => function ($query) use ($locale) {
+
+                $query->where('locale', $locale)
+                    ->where('status', 'approved');
+            }])
+            ->find($id);
 
         if (!$post) {
             return response()->json([
@@ -100,7 +123,9 @@ class PostController extends Controller
                     'title' => $post->title,
                     'content' => $post->content
                 ] : null,
-                'available_translations' => $post->translations->pluck('locale'),
+                'available_translations' => $post->translations
+                    ->where('status', 'approved')
+                    ->pluck('locale'),
                 'created_at' => $post->created_at,
                 'updated_at' => $post->updated_at
             ]
@@ -217,10 +242,10 @@ class PostController extends Controller
             function ($q) use ($keyword, $locale) {
 
                 $q->where('locale', $locale)
+                    ->where('status', 'approved')
                     ->where(function ($query) use ($keyword) {
 
-                        $query
-                            ->where('title', 'like', "%$keyword%")
+                        $query->where('title', 'like', "%$keyword%")
                             ->orWhere('content', 'like', "%$keyword%");
                     });
             }
@@ -241,8 +266,11 @@ class PostController extends Controller
     {
 
 
-        $post = Post::with('translations')
-            ->findOrFail($id);
+        $post = Post::with([
+            'translations' => function ($query) {
+                $query->where('status', 'approved');
+            }
+        ])->findOrFail($id);
 
 
 

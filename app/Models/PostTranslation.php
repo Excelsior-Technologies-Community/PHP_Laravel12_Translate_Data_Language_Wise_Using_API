@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class PostTranslation extends Model
 {
-    protected $fillable = ['post_id', 'locale', 'title', 'content'];
+    protected $fillable = ['post_id', 'locale', 'title', 'content', 'status'];
     
     public $timestamps = true;
     
