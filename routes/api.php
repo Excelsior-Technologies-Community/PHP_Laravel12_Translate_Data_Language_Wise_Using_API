@@ -4,7 +4,9 @@
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\PostController;
-
+use App\Http\Controllers\UserLanguageController;
+use App\Http\Controllers\TranslationAnalyticsController;
+use App\Http\Controllers\TranslationApprovalController;
 
 
 Route::prefix('v1')->group(function () {
@@ -35,6 +37,46 @@ Search Translation
     );
 
 
+    Route::post(
+        'user/language',
+        [UserLanguageController::class, 'update']
+    );
+
+
+    Route::get(
+        'user/language',
+        [UserLanguageController::class, 'show']
+    );
+
+    Route::get(
+        'translation-statistics',
+        [TranslationAnalyticsController::class, 'index']
+    );
+
+
+    /*
+Translation Approval Workflow
+*/
+
+
+    Route::get(
+        'translations/pending',
+        [TranslationApprovalController::class, 'pending']
+    );
+
+
+
+    Route::post(
+        'translations/{id}/approve',
+        [TranslationApprovalController::class, 'approve']
+    );
+
+
+
+    Route::post(
+        'translations/{id}/reject',
+        [TranslationApprovalController::class, 'reject']
+    );
 
     /*
 Export JSON
