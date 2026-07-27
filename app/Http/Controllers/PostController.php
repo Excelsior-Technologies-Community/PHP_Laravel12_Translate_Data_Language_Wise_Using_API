@@ -11,14 +11,14 @@ class PostController extends Controller
     public function index(Request $request)
     {
         $locale = $request->get('lang', 'en');
-        
-        $posts = Post::with(['translations' => function($query) use ($locale) {
+
+        $posts = Post::with(['translations' => function ($query) use ($locale) {
             $query->where('locale', $locale);
         }])->get();
-        
-        $formattedPosts = $posts->map(function($post) use ($locale) {
+
+        $formattedPosts = $posts->map(function ($post) use ($locale) {
             $translation = $post->getTranslated($locale);
-            
+
             return [
                 'id' => $post->id,
                 'title' => $translation->title,
@@ -32,7 +32,7 @@ class PostController extends Controller
                 'updated_at' => $post->updated_at
             ];
         });
-        
+
         return response()->json([
             'success' => true,
             'locale' => $locale,
@@ -75,8 +75,8 @@ class PostController extends Controller
     public function show(Request $request, $id)
     {
         $locale = $request->get('lang', 'en');
-        
-        $post = Post::with(['translations' => function($query) use ($locale) {
+
+        $post = Post::with(['translations' => function ($query) use ($locale) {
             $query->where('locale', $locale);
         }])->find($id);
 
@@ -88,7 +88,7 @@ class PostController extends Controller
         }
 
         $translation = $post->getTranslated($locale);
-        
+
         return response()->json([
             'success' => true,
             'locale' => $locale,
@@ -110,8 +110,10 @@ class PostController extends Controller
     public function translatePost(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'locale' => 'required|string|in:en,hi,gu'
+            'locale' => 'nullable|string|in:en,hi,gu'
         ]);
+
+        $locale = $request->get('locale', 'en');
 
         if ($validator->fails()) {
             return response()->json([
@@ -121,7 +123,7 @@ class PostController extends Controller
         }
 
         $post = Post::find($id);
-        
+
         if (!$post) {
             return response()->json([
                 'success' => false,
@@ -129,9 +131,9 @@ class PostController extends Controller
             ], 404);
         }
 
-        $locale = $request->locale;
+        $locale = $request->get('locale', 'en');
         $translation = $post->getTranslated($locale);
-        
+
         return response()->json([
             'success' => true,
             'message' => 'Post translated successfully',
@@ -147,7 +149,7 @@ class PostController extends Controller
     public function update(Request $request, $id)
     {
         $post = Post::find($id);
-        
+
         if (!$post) {
             return response()->json([
                 'success' => false,
@@ -168,7 +170,7 @@ class PostController extends Controller
         }
 
         $post->update($request->only(['title', 'content']));
-        
+
         // Re-translate all languages if post updated
         if ($request->hasAny(['title', 'content'])) {
             $post->translateAndSave();
@@ -184,7 +186,7 @@ class PostController extends Controller
     public function destroy($id)
     {
         $post = Post::find($id);
-        
+
         if (!$post) {
             return response()->json([
                 'success' => false,
@@ -197,6 +199,62 @@ class PostController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Post deleted successfully'
+        ]);
+    }
+
+    public function search(Request $request)
+    {
+
+        $keyword = $request->keyword;
+
+
+        $locale = $request->lang ?? 'en';
+
+
+
+        $posts = Post::whereHas(
+            'translations',
+            function ($q) use ($keyword, $locale) {
+
+                $q->where('locale', $locale)
+                    ->where(function ($query) use ($keyword) {
+
+                        $query
+                            ->where('title', 'like', "%$keyword%")
+                            ->orWhere('content', 'like', "%$keyword%");
+                    });
+            }
+        )->get();
+
+
+
+        return response()->json([
+
+            'success' => true,
+
+            'data' => $posts
+
+        ]);
+    }
+
+    public function export($id)
+    {
+
+
+        $post = Post::with('translations')
+            ->findOrFail($id);
+
+
+
+        return response()->json([
+
+            'post_id' => $post->id,
+
+            'title' => $post->title,
+
+            'translations' => $post->translations
+
+
         ]);
     }
 }
