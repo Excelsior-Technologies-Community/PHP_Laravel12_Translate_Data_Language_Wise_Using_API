@@ -7,13 +7,18 @@ use App\Services\GoogleTranslateService;
 
 class Post extends Model
 {
-    protected $fillable = ['title', 'content', 'translations'];
+    protected $fillable = ['title', 'content', 'translations', 'translation_status'];
 
     protected $casts = [
         'translations' => 'array'
     ];
 
     public function translations()
+    {
+        return $this->hasMany(PostTranslation::class);
+    }
+
+    public function postTranslations()
     {
         return $this->hasMany(PostTranslation::class);
     }

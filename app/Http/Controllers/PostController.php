@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Post;
+use App\Jobs\TranslatePostJob;
+use App\Services\GoogleTranslateService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -68,10 +70,25 @@ class PostController extends Controller
 
         $post = Post::create([
             'title' => $request->title,
-            'content' => $request->content
+            'content' => $request->content,
+            'translation_status' => $request->boolean('async', false) ? 'translating' : 'completed',
         ]);
 
-        // Auto-translate to all languages
+        if ($request->boolean('async', false)) {
+            TranslatePostJob::dispatch($post);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Post created successfully. Translation job dispatched to background queue.',
+                'data' => [
+                    'post' => $post,
+                    'translation_status' => 'translating',
+                    'check_progress_url' => url("/api/v1/posts/{$post->id}/status"),
+                ]
+            ], 202);
+        }
+
+        // Auto-translate synchronously
         $translations = $post->translateAndSave();
 
         return response()->json([
@@ -82,6 +99,28 @@ class PostController extends Controller
                 'translations' => $translations
             ]
         ], 201);
+    }
+
+    public function status($id)
+    {
+        $post = Post::find($id);
+        if (!$post) {
+            return response()->json(['success' => false, 'message' => 'Post not found'], 404);
+        }
+
+        $translateService = app(GoogleTranslateService::class);
+        $totalSupported = count($translateService->getSupportedLanguages());
+        $completedCount = $post->translations()->count();
+
+        return response()->json([
+            'success' => true,
+            'post_id' => $post->id,
+            'translation_status' => $post->translation_status ?? 'completed',
+            'total_languages' => $totalSupported,
+            'completed_languages' => $completedCount,
+            'progress_percent' => min(100, round(($completedCount / max(1, $totalSupported)) * 100)),
+            'translations' => $post->translations()->get(['locale', 'status', 'created_at']),
+        ]);
     }
 
     public function show(Request $request, $id)
